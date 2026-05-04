@@ -1,78 +1,82 @@
 const express = require('express');
-const app = express();
+const bcrypt = require('bcrypt');
 
-// Middleware para leer JSON
+const app = express();
 app.use(express.json());
 
-/* =========================
-   RUTA PRINCIPAL (PRUEBA)
-========================= */
+// ===== BASE DE DATOS SIMULADA =====
+let usuarios = [];
+let citas = [
+  { paciente: "David", hora: "10:00" },
+  { paciente: "Ana", hora: "11:00" }
+];
+
+// ===== RUTA PRINCIPAL =====
 app.get('/', (req, res) => {
-  res.send("Servidor funcionando correctamente");
+  res.send('Servidor funcionando correctamente');
 });
 
-/* =========================
-   USUARIOS
-========================= */
-
-// Registrar usuario
-app.post('/usuarios', (req, res) => {
-  const usuario = req.body;
-
-  res.json({
-    mensaje: "Usuario registrado correctamente",
-    usuario: usuario
-  });
-});
-
-// Login usuario
-app.post('/login', (req, res) => {
-  const { email, password } = req.body;
-
-  res.json({
-    mensaje: "Login exitoso",
-    email: email
-  });
-});
-
-/* =========================
-   CITAS
-========================= */
-
-// Crear cita
-app.post('/citas', (req, res) => {
-  const cita = req.body;
-
-  res.json({
-    mensaje: "Cita creada correctamente",
-    cita: cita
-  });
-});
-
-// Ver citas
+// ===== OBTENER CITAS =====
 app.get('/citas', (req, res) => {
-  res.json({
-    citas: [
-      { paciente: "David", hora: "10:00" },
-      { paciente: "Ana", hora: "11:00" }
-    ]
-  });
+  res.json({ citas });
 });
 
-/* =========================
-   DISPONIBILIDAD
-========================= */
+// ===== CREAR CITA =====
+app.post('/citas', (req, res) => {
+  const { paciente, hora } = req.body;
 
-app.get('/disponibilidad', (req, res) => {
-  res.json({
-    horarios: ["8:00", "9:00", "10:00", "11:00"]
-  });
+  if (!paciente || !hora) {
+    return res.status(400).json({ mensaje: "Faltan datos" });
+  }
+
+  citas.push({ paciente, hora });
+  res.json({ mensaje: "Cita creada correctamente" });
 });
 
-/* =========================
-   SERVIDOR
-========================= */
+// ===== REGISTRO DE USUARIO (CON CIFRADO) =====
+app.post('/usuarios', async (req, res) => {
+  const { usuario, password } = req.body;
 
+  if (!usuario || !password) {
+    return res.status(400).json({ mensaje: "Faltan datos" });
+  }
+
+  const existe = usuarios.find(u => u.usuario === usuario);
+  if (existe) {
+    return res.status(400).json({ mensaje: "Usuario ya existe" });
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+
+  usuarios.push({ usuario, password: hash });
+
+  res.json({ mensaje: "Usuario registrado correctamente" });
+});
+
+// ===== LOGIN =====
+app.post('/login', async (req, res) => {
+  const { usuario, password } = req.body;
+
+  if (!usuario || !password) {
+    return res.status(400).json({ mensaje: "Faltan datos" });
+  }
+
+  const user = usuarios.find(u => u.usuario === usuario);
+
+  if (!user) {
+    return res.status(404).json({ mensaje: "Usuario no encontrado" });
+  }
+
+  const valido = await bcrypt.compare(password, user.password);
+
+  if (!valido) {
+    return res.status(401).json({ mensaje: "Contraseña incorrecta" });
+  }
+
+  res.json({ mensaje: "Login exitoso" });
+});
+
+// ===== PUERTO =====
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
